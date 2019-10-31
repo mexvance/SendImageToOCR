@@ -11,6 +11,8 @@ using Newtonsoft.Json;
 using System.Net.Http.Headers;
 using System.Text;
 using System.Web;
+using System.Collections.Generic;
+using Newtonsoft.Json.Linq;
 
 namespace SendImageToOCR
 {
@@ -20,7 +22,8 @@ namespace SendImageToOCR
         static string subscriptionkey = "30f3c8a9825e44b0bc19cbc71141ee78";
         static string endpoint = Environment.GetEnvironmentVariable("https://imagereaderocr.cognitiveservices.azure.com/");
         // the analyze method endpoint
-        static string uribase = "https://imagereaderocr.cognitiveservices.azure.com/" + "vision/v2.0/describe?";
+        //static string uribase = "https://imagereaderocr.cognitiveservices.azure.com/" + "vision/v2.1/ocr";
+        static string uribase = "https://imagereaderocr.cognitiveservices.azure.com/" + "vision/v2.1/describe";
         [FunctionName("Function1")]
         public static async Task<IActionResult> Run(
             [HttpTrigger(AuthorizationLevel.Function, "get", "post", Route = null)] HttpRequest req,
@@ -65,13 +68,12 @@ namespace SendImageToOCR
         {
             var client = new HttpClient();
             var queryString = HttpUtility.ParseQueryString(imageFilePath);
-
-
+            //var words = new TextContent();
             // Request headers. Replace the second parameter with a valid subscription key.
             client.DefaultRequestHeaders.Add("Ocp-Apim-Subscription-Key", "30f3c8a9825e44b0bc19cbc71141ee78");
 
             // Request parameters. You can change "landmarks" to "celebrities" on requestParameters and uri to use the Celebrities model.
-            var uri = uribase+ queryString;
+            var uri = uribase;
             
             Console.WriteLine(uri);
 
@@ -79,12 +81,23 @@ namespace SendImageToOCR
 
             // Request body. Try this sample with a locally stored JPEG image.
             //byte[] byteData = GetImageAsByteArray(imageFilePath);
-
-            byte[] byteData = Encoding.UTF8.GetBytes("{body}");
+            byte[] byteData = GetImageAsByteArray("C:/Users/mexva/Pictures/Moved Test Images/RIBBONSHEADER.gif");
             using (var content = new ByteArrayContent(byteData))
             {
-                content.Headers.ContentType = new MediaTypeHeaderValue("application/json");
+                content.Headers.ContentType = new MediaTypeHeaderValue("application/octet-stream");
                 response = await client.PostAsync(uri, content);
+                var resp = await response.Content.ReadAsStringAsync();
+                var region = JObject.Parse(resp)["description"]["captions"];
+                var captionList = new List<CaptionInfo>();
+                var captionInfo = new CaptionInfo();
+                foreach(var item in region)
+                {
+                    //var val = item.Value;
+                    //captionInfo.text = region.Value;
+                    //captionInfo.accuracy = region.
+                    captionInfo = JsonConvert.DeserializeObject<CaptionInfo>(item.ToString());
+                    captionList.Add(captionInfo);
+                }
             }
         }
         static byte[] GetImageAsByteArray(string imageFilePath)
@@ -93,5 +106,11 @@ namespace SendImageToOCR
             BinaryReader binaryReader = new BinaryReader(fileStream);
             return binaryReader.ReadBytes((int)fileStream.Length);
         }
+    }
+
+    public class CaptionInfo
+    {
+        public string text;
+        public double confidence;
     }
 }
